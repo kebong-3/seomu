@@ -83,11 +83,18 @@ $env:SEOMU_LOCAL_ROOTS='{"서무문서":"C:/서무문서"}'
 ## GitHub · Vercel · Render
 
 1. 이 프로젝트의 소스를 새 GitHub 저장소에 업로드합니다. `data`, 연결 키, 실제 공문은 올리지 않습니다.
-2. Vercel 프로젝트의 **Root Directory를 `frontend`**로 설정합니다. 빌드 `npm run build`, 출력 `dist`.
+2. Vercel 프로젝트의 **Root Directory를 저장소 루트(빈칸)**로 설정합니다. 루트 `vercel.json`이 `frontend` 의존성을 설치하고 빌드하여 `frontend/dist`를 배포합니다. 기존 프로젝트의 Root Directory가 `frontend`라면 해당 폴더의 `vercel.json`을 그대로 사용할 수 있습니다(빌드 `npm run build`, 출력 `dist`).
 3. 문서 인식 백엔드는 Render에서 루트 Dockerfile로 실행합니다. `render.yaml`에 지속 디스크 구성이 들어 있습니다. 호스팅 조건과 디스크 설정을 확인한 후 적용하세요.
 4. Render 환경변수에 `SEOMU_API_TOKEN`, `SEOMU_DATA_DIR=/data`, `SEOMU_CORS_ORIGINS=https://본인사이트.vercel.app`을 설정합니다.
 5. Vercel 환경변수 `VITE_API_BASE=https://본인백엔드주소`를 넣고 다시 빌드합니다. 로그인 화면에서 서버 주소를 직접 입력해도 됩니다.
 6. 문서와 SQLite는 백엔드의 지속 디스크에 보관합니다. Vercel 프런트에는 저장하지 않습니다. 한 데이터 폴더에 서버 복제본을 여러 개 띄우지 마세요.
+
+### Vercel 화면이 404인 경우
+
+- 프로젝트의 Git 저장소와 Production Branch가 이 저장소의 `main`에 연결되어 있는지 확인합니다.
+- Root Directory와 출력 폴더를 위 설정에 맞춘 후 새 배포를 실행합니다. 루트 배포에서 `dist`를 출력 폴더로 지정하면 안 됩니다.
+- Deployments에서 배포가 Ready인지, Domains에서 접속 주소가 해당 프로젝트의 프로덕션 배포에 연결되어 있는지 확인합니다. 삭제되거나 연결이 해제된 도메인은 코드 변경만으로 복구되지 않습니다.
+- 화면이 열려도 문서 서버를 별도로 실행해야 합니다. Vercel 정적 배포는 Python 문서 인식 서버를 실행하지 않습니다. `VITE_API_BASE` 또는 연결 화면의 서버 주소에 백엔드 주소를 입력하고, 백엔드의 `SEOMU_CORS_ORIGINS`에 실제 프런트 주소를 등록합니다.
 
 ## Hugging Face Spaces
 

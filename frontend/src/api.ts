@@ -4,7 +4,12 @@ export function key(){return sessionStorage.getItem('seomu-key')||''}
 export async function api<T>(path:string, options:RequestInit={}):Promise<T>{
   const headers=new Headers(options.headers);headers.set('X-Seomu-Key',key());
   if(options.body && !(options.body instanceof FormData)) headers.set('Content-Type','application/json');
-  const response=await fetch(base()+path,{...options,headers});
+  let response:Response;
+  try{response=await fetch(base()+path,{...options,headers});}
+  catch{throw new Error('서버에 연결할 수 없습니다. 서버 주소와 실행 상태, 접속 허용 설정을 확인해 주세요.');}
+  if(!response.headers.get('Content-Type')?.includes('application/json')){
+    throw new Error('문서 서버의 응답을 받지 못했습니다. 별도로 실행한 문서 서버 주소를 입력해 주세요.');
+  }
   if(!response.ok){const j=await response.json().catch(()=>({detail:'서버 연결을 확인해 주세요.'}));throw new Error(typeof j.detail==='string'?j.detail:'요청 내용을 확인해 주세요.');}
   return response.json() as Promise<T>;
 }
