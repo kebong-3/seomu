@@ -1,0 +1,10 @@
+fastapi==0.143.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+pypdf==6.10.0
+pdfplumber==0.11.9
+openpyxl==3.1.5
+Pillow==12.3.0
+defusedxml==0.7.1
+httpx==0.28.1
+hwp-hwpx-parser==1.0.0

@@ -1,0 +1,3 @@
+# Optional, requires separate model cache and sufficient RAM. Install base requirements first.
+docling>=2.70,<3
+sentence-transformers>=3,<6

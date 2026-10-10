@@ -1,0 +1,18 @@
+# Persistent disk is required for document retention. Review the hosting plan before deployment.
+services:
+  - type: web
+    name: seomu-assistant
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SEOMU_DATA_DIR
+        value: /data
+      - key: SEOMU_API_TOKEN
+        generateValue: true
+      - key: SEOMU_CORS_ORIGINS
+        sync: false
+    disk:
+      name: seomu-documents
+      mountPath: /data
+      sizeGB: 1

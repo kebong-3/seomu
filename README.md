@@ -1,0 +1,161 @@
+---
+title: Seomu Assistant
+emoji: 📂
+colorFrom: indigo
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
+# 서무비서 0.2 — 폴더 문서 인식 앱
+
+폴더 속 공문·매뉴얼·표를 읽어 출처와 함께 검색하고, 확인한 기한을 업무카드로 등록하는 **React/TypeScript + Python/FastAPI** 프로젝트입니다. 앞서 제공한 HTML 기획안에서 새로 구현한 첫 실행 버전입니다.
+
+## 실제 구현
+
+- 폴더·여러 파일·ZIP 가져오기. 하위 폴더의 상대경로 보존.
+- 등록한 서버/PC 폴더 수집 및 로컬 CLI 주기 확인. 원본 폴더를 수정하지 않음.
+- 파일 내용 해시로 변경 여부 확인, 같은 경로의 변경 파일 버전 증가.
+- PDF 페이지별 텍스트/표 추출, 스캔 페이지 Tesseract 한국어 OCR 전환.
+- HWPX의 XML 문단·표, HWP의 본문·표, DOCX·PPTX·XLSX·CSV·이미지 인식.
+- 시트·행·셀과 수식 표기. 계산 캐시가 없는 수식·숨김 시트를 확인 대상으로 표시.
+- 폴더 범위 검색, 한국어 문자 bigram BM25 검색, 원문 위치·문서 버전 표시.
+- 선택 기능: 로컬 SentenceTransformer 의미검색과 순위 결합(RRF), Docling 추출기, OpenAI 호환 생성형 AI.
+- AI 미연결 때도 **원문 근거 검색**이 작동하며 생성형 AI로 가장하지 않음.
+- 문서별 실패·경고·재인식·원본 다운로드·삭제, 문서목록 CSV 출력.
+- 공문의 날짜 후보와 기한 충돌 확인, 수동 확인을 거친 업무카드, 원문 버전 변경 경고.
+- SQLite 저장과 재시작 시 대기 작업 복구. 개인 연결 키로 API와 원본 접근 보호.
+
+## 현재 범위
+
+이 버전은 **단일 개인/부서 업무공간의 문서 인식 MVP**입니다. 직원별 로그인, SSO, 부서별 RBAC, 공식 결재·새올·온나라 연계, 교육 인정 심사와 여비 지급 엔진, 제출 폼 배포·직원별 취합은 아직 구현하지 않았습니다. 기존 기획의 전체 기능이 완료된 제품으로 표현하지 않습니다.
+
+Docling·의미검색·생성형 모델은 연결 코드가 있으나 별도 설치·모델·서버가 필요합니다. 이번 검증은 기본 인식기와 검색·업무카드 중심이며, 선택 모델의 한국어 정확도나 외부 API 실연결을 검증한 것은 아닙니다.
+
+## 빠른 시작: Windows
+
+Python 3.12와 Node.js 22를 설치하고 프로젝트를 압축 해제하세요.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1
+```
+
+실행 후 `http://127.0.0.1:8000`을 엽니다. 같은 서버이므로 주소 입력칸은 비워 둡니다. 연결 키는 `backend/data/access-token.txt`에서 확인합니다. 임의로 지정한 `SEOMU_API_TOKEN`이 있으면 해당 값을 사용합니다.
+
+텍스트 PDF·Office·HWPX·HWP는 기본 설치로 읽습니다. **이미지·스캔 PDF**는 Tesseract, kor/eng 언어팩, Poppler의 `pdftoppm`을 따로 설치해 PATH에 등록해야 합니다. 미설치 상태는 설정 화면과 실패 사유에 표시됩니다. Docker 실행은 한국어 OCR 도구를 이미지에 포함합니다.
+
+## Docker: 한국어 OCR 포함
+
+```bash
+docker build -t seomu-assistant .
+docker run --rm -p 7860:7860 -v seomu-data:/data -e SEOMU_API_TOKEN="직접생성한긴연결키" seomu-assistant
+```
+
+`http://localhost:7860`에서 접속합니다. 실제 연결 키를 소스나 GitHub에 넣지 마세요. Docker 이미지 빌드·실제 배포는 이번 작업 환경에서 실행하지 않았습니다.
+
+## PC 폴더를 연결하는 두 가지 방법
+
+### A. 브라우저의 ‘폴더 가져오기’
+
+직접 선택한 폴더의 현재 문서를 가져옵니다. 웹 브라우저가 PC의 모든 폴더를 상시 읽는 방식은 아닙니다. 같은 폴더를 다시 가져오면 해시로 변경 여부를 확인합니다.
+
+### B. 로컬 폴더 연결기
+
+백엔드와 같은 PC, 같은 `SEOMU_DATA_DIR`에서 실행합니다.
+
+```powershell
+cd backend
+# PowerShell: 아래는 예시 폴더입니다. 본인의 문서 경로로 바꾸세요.
+..\.venv\Scripts\python.exe -m app.cli scan --root "C:/서무문서" --name "서무문서"
+..\.venv\Scripts\python.exe -m app.cli watch --root "C:/서무문서" --name "서무문서" --interval 30
+```
+
+서버가 켜져 있으면 폴더 연결기는 같은 SQLite에 작업을 넣고 서버의 단일 작업자가 인식합니다. 서버가 없으면 연결기가 직접 처리합니다. 하위 폴더를 재귀 탐색하고 원본 파일은 수정하지 않습니다. 삭제한 파일의 색인은 자동 삭제하지 않으며 문서함에서 정리하세요. 폴더 이름을 바꾸면 새로운 경로로 인식됩니다.
+
+설정 화면에서 ‘변경 확인’을 쓰려면 서버 시작 전에 별칭을 등록합니다.
+
+```powershell
+$env:SEOMU_LOCAL_ROOTS='{"서무문서":"C:/서무문서"}'
+```
+
+환경변수는 서버를 재시작해야 적용됩니다. `.env.example`은 설명용이며 Python에서 자동 읽지 않습니다.
+
+## GitHub · Vercel · Render
+
+1. 이 프로젝트의 소스를 새 GitHub 저장소에 업로드합니다. `data`, 연결 키, 실제 공문은 올리지 않습니다.
+2. Vercel 프로젝트의 **Root Directory를 `frontend`**로 설정합니다. 빌드 `npm run build`, 출력 `dist`.
+3. 문서 인식 백엔드는 Render에서 루트 Dockerfile로 실행합니다. `render.yaml`에 지속 디스크 구성이 들어 있습니다. 호스팅 조건과 디스크 설정을 확인한 후 적용하세요.
+4. Render 환경변수에 `SEOMU_API_TOKEN`, `SEOMU_DATA_DIR=/data`, `SEOMU_CORS_ORIGINS=https://본인사이트.vercel.app`을 설정합니다.
+5. Vercel 환경변수 `VITE_API_BASE=https://본인백엔드주소`를 넣고 다시 빌드합니다. 로그인 화면에서 서버 주소를 직접 입력해도 됩니다.
+6. 문서와 SQLite는 백엔드의 지속 디스크에 보관합니다. Vercel 프런트에는 저장하지 않습니다. 한 데이터 폴더에 서버 복제본을 여러 개 띄우지 마세요.
+
+## Hugging Face Spaces
+
+이 저장소는 README의 `sdk: docker`, `app_port: 7860`과 Dockerfile을 포함해 Docker Space 구조로 준비되어 있습니다. Space Secrets에 `SEOMU_API_TOKEN`을 등록하고 **가상 샘플로 시연**할 수 있습니다. 지속 저장 연결은 별도로 설계해야 하며 기본 Space 디스크만으로 문서 보존을 보장하지 않습니다. 현재 SQLite 저장을 Storage Bucket에 자동 동기화하는 코드는 없습니다.
+
+Hugging Face의 공개 OCR Space에 실제 공문을 자동 업로드하는 기능은 없습니다. 그 사례의 문서 구조화 방식을 참고하고 모델·처리기를 자체 환경에 배치하는 접근입니다.
+
+## 선택 AI 설정
+
+OpenAI 호환 `/v1` API를 제공하는 로컬/기관 승인 서버를 연결합니다. 예시:
+
+```powershell
+$env:SEOMU_LLM_BASE_URL='http://127.0.0.1:11434/v1'
+$env:SEOMU_LLM_MODEL='본인이설치한모델명'
+# 인증이 필요한 서버만 키를 설정합니다.
+$env:SEOMU_LLM_API_KEY='서버비밀키'
+```
+
+대회 지정 AI를 확정하지 못했으므로 특정 모델을 대회 요건 충족 모델로 표시하지 않았습니다. 연결한 AI에는 질문과 검색 근거가 전송됩니다. 외부 제공자를 선택하면 기관의 자료 처리 범위를 먼저 확인하세요.
+
+### Docling / 의미검색
+
+```bash
+pip install -r backend/requirements-advanced.txt
+```
+
+- Docling을 쓰려면 `SEOMU_PARSER=docling`으로 설정하고 필요한 모델 캐시를 먼저 준비합니다. 실패 시 기본 인식기로 돌아가고 경고를 남깁니다.
+- 의미검색은 `SEOMU_EMBEDDING_MODEL_PATH`에 **다운로드된 로컬 SentenceTransformer 모델 폴더**를 지정합니다. 기존 문서는 재인식해야 벡터가 생성됩니다. BGE-M3는 조사한 후보이며 자동 설치/다운로드하지 않습니다.
+- 모델 용량·라이선스·한국어 성능은 선택한 모델 기준으로 따로 확인해야 합니다. 오프라인은 모델 캐시가 있는 상태에서 `HF_HUB_OFFLINE=1` 등으로 구성합니다.
+
+## 제한과 데이터 처리
+
+- 파일당 30MB, 배치/압축 해제 200MB, 500개 파일, PDF 200페이지, 문서당 10,000블록. 여러 하위 폴더로 나누어 가져올 수 있습니다.
+- 기본 검색은 최대 50,000개 추출 블록을 대상으로 합니다. 더 큰 조직 자료는 벡터 DB/검색 서버 확장이 필요합니다.
+- 기본 표 인식은 행·셀 추출입니다. 스캔 표의 병합 셀·다단 편집·필기·저화질·수식 의미를 완벽하게 복원하지 않습니다.
+- HWP는 페이지 위치를 복원하지 않으며 본문/표 위치로 표시합니다. DOCX도 인쇄 페이지 번호를 추정하지 않습니다.
+- TIFF는 기본 이미지 처리의 첫 프레임을 대상으로 합니다. 다중 페이지 TIFF는 PDF로 변환해 주세요.
+- 폴더의 숨김 파일과 심볼릭 링크는 로컬 수집에서 제외됩니다. XLSX 숨김 시트는 포함하고 경고합니다.
+- 현재 원본은 해당 경로의 최신 버전만 보관합니다. 변경 버전의 번호와 업무 연결 확인은 제공하지만 과거 원본 파일 복구는 제공하지 않습니다.
+- 원본·추출문·색인은 설정한 서버/PC에 저장합니다. API 키는 서버 환경변수, 업무공간 키는 브라우저 sessionStorage에 보관합니다.
+- 단일 공유 연결 키는 개인 시연용 접근제어입니다. 다중 사용자별 보안·감사·접근범위의 완성형을 의미하지 않습니다.
+- 원본 삭제 시 관련 블록·벡터를 삭제합니다. 파일 시스템/백업의 완전 소거를 보장하는 기능은 아닙니다.
+
+## 검증
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest -q
+cd ../frontend
+npm ci
+npm run build
+```
+
+검증 상세: [docs/TEST_REPORT.md](docs/TEST_REPORT.md)
+참고 사례와 반영 여부: [docs/RESEARCH.md](docs/RESEARCH.md)
+
+## 폴더 구성
+
+| 경로 | 역할 |
+|---|---|
+| frontend/src | React 화면·폴더 선택·문서 인식 결과·근거·업무카드 |
+| backend/app/parsers.py | 형식별 본문·표·OCR 추출 |
+| backend/app/service.py | 폴더 수집·해시·버전·작업 큐·원본 보관 |
+| backend/app/retrieval.py | 한국어 검색·로컬 벡터 결합·기한 후보 |
+| backend/app/assistant.py | 모델 연결·인용 식별자 확인·근거 대체 표시 |
+| backend/app/cli.py | 로컬 폴더 수집·주기 확인 |
+| sample-documents | 가상 샘플 공문·자료 |
+| docs | 조사·실행·검증 문서 |
+
+타 프로젝트 소스를 복사한 포크는 아닙니다. 기본 실행 의존성은 각 라이브러리의 라이선스를 따릅니다. 조사 사례의 라이선스를 앱 전체에 일괄 적용하지 않습니다.
