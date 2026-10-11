@@ -4,3 +4,8 @@
 .venv/
 .vercel/
 backend/data/
+
+work/
+.env
+.env.*
+!.env.example

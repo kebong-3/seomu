@@ -171,7 +171,7 @@ class Service:
     def parse_process(self, path):
         s=self.settings
         options={k:getattr(s,k) for k in ('parser','max_pages','max_blocks','ocr_languages')}
-        r=subprocess.run([sys.executable,'-m','app.worker',str(path),json.dumps(options)],capture_output=True,text=True,timeout=360,cwd=Path(__file__).parent.parent)
+        r=subprocess.run([sys.executable,'-m','app.worker',str(path),json.dumps(options)],capture_output=True,text=True,encoding="utf-8",env={**os.environ,"PYTHONIOENCODING":"utf-8"},timeout=360,cwd=Path(__file__).parent.parent)
         if r.returncode:
             message=r.stderr.strip().splitlines()[-1] if r.stderr.strip() else '문서를 읽을 수 없습니다.'
             # Parser messages only; don't expose traceback/system filesystem locations.

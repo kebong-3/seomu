@@ -17,11 +17,14 @@ from .config import Settings, SUPPORTED
 from .service import Service, clean_path, now
 from .retrieval import search, deadline_proposals
 from .assistant import answer
+from .model_provider import provider_options
+from .request_draft import draft_request
 
 
 class Question(BaseModel):
     question: str = Field(min_length=2, max_length=1200)
     folder: str = Field(default='',max_length=1000)
+    provider: str = Field(default='default',pattern='^(default|evidence|gemma|gpt|compatible)$')
 
 
 class Task(BaseModel):
@@ -40,6 +43,10 @@ class Scan(BaseModel):
 
 class TaskState(BaseModel):
     status: str
+
+
+class DraftRequest(BaseModel):
+    provider: str = Field(pattern='^(gemma|gpt|compatible)$')
 
 
 def create_app(settings=None):
@@ -90,7 +97,8 @@ def create_app(settings=None):
                 'hwp_available':bool(importlib.util.find_spec('hwp_hwpx_parser')),
                 'docling_available':bool(importlib.util.find_spec('docling')),
                 'semantic_configured':bool(settings.embedding_path),'semantic_error':service.embedding_error,
-                'ai_configured':bool(settings.llm_url and settings.llm_model),
+                'ai_configured':any(p['configured'] for p in provider_options(settings) if p['id']!='evidence'),
+                'ai_providers':provider_options(settings),
                 'roots':list(settings.roots),'formats':sorted(SUPPORTED),'max_file_mb':30,'max_batch_mb':200,'max_files':500,
                 'workspace':'single-private-workspace'}
 
@@ -180,11 +188,15 @@ def create_app(settings=None):
 
     @app.post('/api/ask',dependencies=auth)
     def ask(body:Question):
-        return answer(service,body.question,body.folder)
+        return answer(service,body.question,body.folder,provider_id=body.provider)
 
     @app.get('/api/documents/{doc_id}/task-proposal',dependencies=auth)
     def propose(doc_id):
         return deadline_proposals(service.detail(doc_id))
+
+    @app.post('/api/documents/{doc_id}/request-draft',dependencies=auth)
+    def request_draft(doc_id, body:DraftRequest):
+        return draft_request(service,doc_id,body.provider)
 
     @app.get('/api/tasks',dependencies=auth)
     def tasks():

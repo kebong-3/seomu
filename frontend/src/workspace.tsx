@@ -35,8 +35,11 @@ import type { Workspace, Request, Work, Submission } from "./workspace-store";
 import { DocumentWorkspace } from "./document-workspace";
 import "./workspace.css";
 import { SettlementDraft } from "./settlement-draft";
+import {AISettings} from './ai-settings';
+import type {SourceRequest} from './types';
 
 type Page =
+  | "ai"
   | "today"
   | "requests"
   | "education"
@@ -70,7 +73,7 @@ export function WorkspaceApp() {
   const [term, setTerm] = useState("");
   const [notice, setNotice] = useState("");
   const [requestSeed, setRequestSeed] = useState<
-    { title: string; reference: string } | undefined
+    SourceRequest | undefined
   >();
   const [docMode, setDocMode] = useState<
     "documents" | "ask" | "settings" | "tasks"
@@ -222,6 +225,7 @@ export function WorkspaceApp() {
               { id: "documents", label: "공문·폴더 문서함", icon: FolderOpen },
               { id: "search", label: "문서 근거 검색", icon: Search },
               { id: "calendar", label: "업무·반복 일정", icon: CalendarDays },
+              { id: "ai", label: "AI 연결 · Gemma / GPT", icon: Settings },
             ] as const
           ).map((m) => (
             <button
@@ -279,7 +283,8 @@ export function WorkspaceApp() {
                   search: "문서 근거 검색",
                   calendar: "업무·반복 일정",
                   tools: cat.name,
-                }[page as "documents" | "search" | "calendar" | "tools"]}
+                  ai: 'AI 연결 · Gemma / GPT',
+                }[page as "documents" | "search" | "calendar" | "tools" | 'ai']}
             </b>
           </div>
           <span className="storage-pill">내 브라우저 저장</span>
@@ -830,6 +835,7 @@ export function WorkspaceApp() {
               </section>
             </>
           )}
+          {page==='ai'&&<AISettings onConnect={()=>{navigate('documents');setDocMode('settings');}}/>}
           {page === "department" && (
             <Department
               data={data}
@@ -974,17 +980,17 @@ function NewRequest({
   onClose,
   onSave,
 }: {
-  seed?: { title: string; reference: string };
+  seed?: SourceRequest;
   cat: Category;
   employees: Workspace["employees"];
   onClose: () => void;
   onSave: (r: Request) => void;
 }) {
   const [title, setTitle] = useState(seed?.title || cat.name + " 자료 제출");
-  const [deadline, setDeadline] = useState("");
+  const [deadline, setDeadline] = useState(seed?.deadline||"");
   const [reference, setReference] = useState(seed?.reference || "");
-  const [fields, setFields] = useState(cat.items.join("\n"));
-  const [selected, setSelected] = useState(employees.map((e) => e.id));
+  const [fields, setFields] = useState((seed?.fields?.length?seed.fields:cat.items).join("\n"));
+  const [selected, setSelected] = useState<string[]>(seed?.aiSuggested?[]:employees.map((e) => e.id));
   const [error, setError] = useState("");
   return (
     <div className="portal-overlay">

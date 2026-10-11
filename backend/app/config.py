@@ -20,6 +20,11 @@ class Settings:
     llm_url: str = field(default_factory=lambda: os.getenv('SEOMU_LLM_BASE_URL', ''))
     llm_key: str = field(default_factory=lambda: os.getenv('SEOMU_LLM_API_KEY', ''))
     llm_model: str = field(default_factory=lambda: os.getenv('SEOMU_LLM_MODEL', ''))
+    ai_provider: str = field(default_factory=lambda: os.getenv('SEOMU_AI_PROVIDER', 'compatible'))
+    openai_key: str = field(default_factory=lambda: os.getenv('OPENAI_API_KEY', ''))
+    gpt_model: str = field(default_factory=lambda: os.getenv('SEOMU_GPT_MODEL', 'gpt-5-mini'))
+    gemma_key: str = field(default_factory=lambda: os.getenv('GEMINI_API_KEY', ''))
+    gemma_model: str = field(default_factory=lambda: os.getenv('SEOMU_GEMMA_MODEL', 'gemma-4-26b-a4b-it'))
     roots: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):

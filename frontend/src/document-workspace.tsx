@@ -36,7 +36,10 @@ import type {
   Proposal,
   Status,
   Evidence,
+  SourceRequest,
+  AIRequestDraft,
 } from "./types";
+import {AISelector} from './ai-settings';
 import "./styles.css";
 
 type View = "home" | "documents" | "ask" | "tasks" | "settings";
@@ -67,7 +70,7 @@ export function DocumentWorkspace({
   onRequest,
 }: {
   initialView?: View;
-  onRequest?: (source: { title: string; reference: string }) => void;
+  onRequest?: (source: SourceRequest) => void;
 }) {
   const [view, setView] = useState<View>(initialView);
   const [connected, setConnected] = useState(false);
@@ -77,6 +80,10 @@ export function DocumentWorkspace({
   const [docs, setDocs] = useState<Doc[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [status, setStatus] = useState<Status | null>(null);
+  const [aiProvider,setAIProvider]=useState('evidence');
+  const [aiDraft,setAIDraft]=useState<AIRequestDraft|null>(null);
+  const [drafting,setDrafting]=useState(false);
+  const [draftConfirmed,setDraftConfirmed]=useState(false);
   const [folder, setFolder] = useState("");
   const [query, setQuery] = useState("");
   const [docFilter, setDocFilter] = useState("all");
@@ -247,7 +254,7 @@ export function DocumentWorkspace({
       setAnswer(
         await api<Answer>("/api/ask", {
           method: "POST",
-          body: JSON.stringify({ question: text, folder }),
+          body: JSON.stringify({ question: text, folder, provider:aiProvider }),
         }),
       );
     } catch (e) {
@@ -266,6 +273,12 @@ export function DocumentWorkspace({
     } catch (e) {
       setMessage((e as Error).message);
     }
+  }
+  async function draftRequest(){
+    if(!selected||aiProvider==='evidence')return;
+    setDrafting(true);setAIDraft(null);setDraftConfirmed(false);
+    try{setAIDraft(await api<AIRequestDraft>('/api/documents/'+selected.id+'/request-draft',{method:'POST',body:JSON.stringify({provider:aiProvider})}));}
+    catch(e){setMessage((e as Error).message);}finally{setDrafting(false);}
   }
   async function saveTask() {
     if (!proposal) return;
@@ -982,7 +995,7 @@ export function DocumentWorkspace({
                 </div>
                 <span className="mode-chip">
                   <span className="dot" />
-                  {status?.ai_configured ? "AI 답변 연결" : "원문 근거 모드"}
+                  {aiProvider==='evidence' ? "원문 근거 모드" : status?.ai_providers?.find(p=>p.id===aiProvider)?.label}
                 </span>
               </div>
               <div className="ask-layout">
@@ -994,6 +1007,7 @@ export function DocumentWorkspace({
                       void ask();
                     }}
                   >
+                    <AISelector options={status?.ai_providers} value={aiProvider} onChange={setAIProvider}/>
                     <label>
                       질문할 문서 범위
                       <select
@@ -1174,6 +1188,7 @@ export function DocumentWorkspace({
           )}
           {view === "settings" && (
             <>
+              <section className="panel settings-panel"><h2>AI 연결 상태</h2>{status?.ai_providers?.filter(p=>p.id!=='evidence').map(p=><div className="setting-row" key={p.id}><span>{p.label}</span><b>{p.configured?p.model+' · 설정됨 (실호출 미확인)':'서버 API 설정 필요'}</b></div>)}<p className="caption">Gemma와 GPT는 서버에 각각 설정합니다. 실제 사용 시 모델을 선택하며, API 키를 화면에 표시하거나 저장하지 않습니다.</p></section>
               <div className="page-heading">
                 <div>
                   <span className="eyebrow">CONNECTED, YOUR WAY</span>
@@ -1348,6 +1363,8 @@ export function DocumentWorkspace({
               <span>v{selected.version}</span>
               <span>{selected.char_count.toLocaleString()}자</span>
             </div>
+            {onRequest&&<div className="ai-draft-tools"><AISelector options={status?.ai_providers} value={aiProvider} onChange={setAIProvider}/><button className="primary" disabled={drafting||aiProvider==='evidence'||!selected.block_count} onClick={()=>void draftRequest()}><Sparkles size={16}/>{drafting?'원문을 읽는 중':'AI로 요청 초안'}</button></div>}
+            {aiDraft&&aiDraft.source_id===selected.id&&<section className="ai-draft-review"><h3>공문에서 추출한 요청 초안</h3><p className="small muted">{aiDraft.model_run.provider} · {aiDraft.model_run.model}</p>{([{name:'요청 제목',field:aiDraft.title},{name:'제출기한',field:aiDraft.deadline},{name:'제출 대상',field:aiDraft.audience},...aiDraft.fields.map(f=>({name:'제출항목',field:f}))]).map((item,i)=><article key={i}><small>{item.name}</small><b>{item.field?.value||'확인 필요 · 원문에서 직접 지정'}</b>{item.field&&<><p>{item.field.quote}</p><small>{item.field.locator}</small></>}</article>)}{aiDraft.warnings.map(w=><p className="caption" key={w}>{w}</p>)}<label className="checkbox"><input type="checkbox" checked={draftConfirmed} onChange={e=>setDraftConfirmed(e.target.checked)}/>원문과 기한·대상·제출항목을 확인했습니다.</label><button className="primary" disabled={!draftConfirmed||drafting} onClick={()=>{onRequest?.({title:aiDraft.title?.value||selected.name+' 자료 제출',reference:aiDraft.source_path+' · v'+aiDraft.source_version,deadline:aiDraft.deadline?.value||'',fields:aiDraft.fields.map(f=>f.value),aiSuggested:true});setAIDraft(null);setSelected(null);}}>확인한 내용으로 요청 양식 열기</button></section>}
             <div className="drawer-actions">
               {onRequest && (
                 <button
