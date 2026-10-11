@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const source=readFileSync(new URL('../src/settlement-session.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const context={exports:{},require:()=>({})}; vm.runInNewContext(compiled,context);
+const {parseSettlement}=context.exports;
+const fallback={mode:'출장',days:'1',draft:'',evidence:{}};
+for(const bad of ['{bad','null',JSON.stringify({version:2,data:fallback}),JSON.stringify({version:1,data:{...fallback,days:1}}),JSON.stringify({version:1,data:{...fallback,evidence:{receipt:'yes'}}}),JSON.stringify({version:1,data:[]})]) assert.equal(parseSettlement(bad,fallback),fallback);
+const resumed=parseSettlement(JSON.stringify({version:1,data:{...fallback,days:'3',draft:'사용자 편집',evidence:{receipt:true},unexpected:'ignore'}}),fallback);
+assert.equal(resumed.days,'3'); assert.equal(resumed.draft,'사용자 편집'); assert.equal(resumed.evidence.receipt,true); assert.equal('unexpected' in resumed,false);
+assert.equal(parseSettlement(JSON.stringify({version:1,data:{...fallback,draft:'x'.repeat(100001)}}),fallback),fallback);
+console.log('정산 저장 복원·손상자료·버전·타입·추가키·크기 검증 통과');

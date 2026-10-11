@@ -1,3 +1,4 @@
+import { useSettlementSession } from "./settlement-session";
 import { useState } from "react";
 import { saveFile } from "./workspace-store";
 
@@ -13,14 +14,16 @@ export function printableDraft(text: string) {
 export function SettlementDraft({ department, mode, amount, formula, valid, needsTransport, needsLodging }: {
   department: string; mode: string; amount: number; formula: string; valid: boolean; needsTransport: boolean; needsLodging: boolean;
 }) {
-  const [purpose, setPurpose] = useState("");
-  const [owner, setOwner] = useState("");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [basis, setBasis] = useState("");
-  const [evidence, setEvidence] = useState<Record<string, boolean>>({});
-  const [draft, setDraft] = useState("");
-  const [snapshot, setSnapshot] = useState("");
+  const session = useSettlementSession("draft", { purpose: "", owner: "", start: "", end: "", basis: "", evidence: {} as Record<string, boolean>, draft: "", snapshot: "" });
+  const { purpose, owner, start, end, basis, evidence, draft, snapshot } = session.data;
+  const setPurpose = session.field("purpose");
+  const setOwner = session.field("owner");
+  const setStart = session.field("start");
+  const setEnd = session.field("end");
+  const setBasis = session.field("basis");
+  const setEvidence = session.field("evidence");
+  const setDraft = session.field("draft");
+  const setSnapshot = session.field("snapshot");
   const [message, setMessage] = useState("");
   const checks = settlementChecks(mode, needsTransport, needsLodging);
   const missing = [!purpose.trim() && "업무 목적", !owner.trim() && "정산 대상·담당", (!start || !end) && "기간", start && end && start > end && "기간 순서", !basis.trim() && "기관 기준의 문서명·조항·확인일", !valid && "계산 입력", ...checks.filter(c => !evidence[c])].filter(Boolean) as string[];
@@ -43,7 +46,7 @@ export function SettlementDraft({ department, mode, amount, formula, valid, need
     <fieldset className="draft-checks"><legend>증빙·검토 확인</legend>{checks.map(c => <label key={c}><input type="checkbox" checked={Boolean(evidence[c])} onChange={e => setEvidence({...evidence, [c]: e.target.checked})} />{c}</label>)}</fieldset>
     <div className="local-note" aria-live="polite">{missing.length ? `제출 전 ${missing.length}개 확인 필요: ${missing.join(" · ")}` : "입력·체크 완료. 최종 판단 전 원문과 대조하세요."}</div>
     <button className="primary" onClick={generate}>{draft ? "최신 입력으로 초안 다시 만들기" : "정산 검토 초안 만들기"}</button>
-    {draft && <><label>직접 편집할 초안<textarea className="draft-text" value={draft} onChange={e => setDraft(e.target.value)} /></label>{stale && <p className="form-error" role="alert">계산 또는 기초 입력이 바뀌었습니다. 기존 초안은 이전 값이므로 저장을 잠시 막았습니다. 수정한 내용을 복사해 보관한 뒤 초안을 다시 만드세요.</p>}<div className="actions"><button className="secondary" disabled={stale} onClick={() => saveFile("정산검토-편집초안.txt", draft, "text/plain;charset=utf-8")}>편집 초안 TXT 저장</button><button className="secondary" disabled={stale} onClick={() => saveFile("정산검토-인쇄본.html", printableDraft(draft), "text/html;charset=utf-8")}>인쇄용 HTML 저장</button></div><p className="small muted">TXT는 직접 편집할 수 있습니다. HTML은 브라우저에서 열어 인쇄할 수 있으며 기관 공식 서식은 아닙니다. 이 화면의 입력은 메뉴를 떠나면 초기화되므로 초안을 저장하세요.</p></>}
+    {draft && <><label>직접 편집할 초안<textarea className="draft-text" value={draft} onChange={e => setDraft(e.target.value)} /></label>{stale && <p className="form-error" role="alert">계산 또는 기초 입력이 바뀌었습니다. 기존 초안은 이전 값이므로 저장을 잠시 막았습니다. 수정한 내용을 복사해 보관한 뒤 초안을 다시 만드세요.</p>}<div className="actions"><button className="secondary" disabled={stale} onClick={() => saveFile("정산검토-편집초안.txt", draft, "text/plain;charset=utf-8")}>편집 초안 TXT 저장</button><button className="secondary" disabled={stale} onClick={() => saveFile("정산검토-인쇄본.html", printableDraft(draft), "text/html;charset=utf-8")}>인쇄용 HTML 저장</button></div><p className="small muted">TXT는 직접 편집할 수 있습니다. HTML은 브라우저에서 열어 인쇄할 수 있으며 기관 공식 서식은 아닙니다. {session.saved ? "편집 내용도 이 브라우저에 자동 보관됩니다. 중요한 초안은 파일로도 저장하세요." : "편집 내용 저장에 실패했습니다. 메뉴를 떠나기 전에 파일로 저장하세요."}</p></>}
     <p className="small muted" role="status">{message}</p>
   </section>;
 }

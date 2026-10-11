@@ -1,3 +1,4 @@
+import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
@@ -1461,14 +1462,17 @@ function WorkEditor({
   );
 }
 function Settlement({ department, onRequest }: { department: string; onRequest: () => void }) {
-  const [mode, setMode] = useState("출장");
-  const [days, setDays] = useState("1");
-  const [daily, setDaily] = useState("");
-  const [transport, setTransport] = useState("");
-  const [lodging, setLodging] = useState("");
-  const [deduction, setDeduction] = useState("");
-  const [people, setPeople] = useState("1");
-  const [unit, setUnit] = useState("");
+  const session = useSettlementSession("calculation", {"mode": "출장", "days": "1", "daily": "", "transport": "", "lodging": "", "deduction": "", "people": "1", "unit": ""});
+  const { mode, days, daily, transport, lodging, deduction, people, unit } = session.data;
+  const setMode = session.field("mode");
+  const setDays = session.field("days");
+  const setDaily = session.field("daily");
+  const setTransport = session.field("transport");
+  const setLodging = session.field("lodging");
+  const setDeduction = session.field("deduction");
+  const setPeople = session.field("people");
+  const setUnit = session.field("unit");
+  const [resetCount, setResetCount] = useState(0);
   const values =
     mode === "출장"
       ? [days, daily, transport, lodging, deduction]
@@ -1498,6 +1502,8 @@ function Settlement({ department, onRequest }: { department: string; onRequest: 
           정산자료 요청 <Send size={17} />
         </button>
       </div>
+      <p className="local-note" role="status">{session.saved ? "이 브라우저에 정산 입력과 초안을 자동 보관합니다. 다른 메뉴나 새로고침 후 이어서 작성할 수 있습니다." : "브라우저 저장이 불가능합니다. 메뉴를 떠나기 전에 초안을 파일로 저장하세요."} 기기·브라우저 간에는 공유되지 않습니다.</p>
+      <button className="secondary" onClick={() => { if (window.confirm("계산 입력, 업무 맥락, 증빙 체크와 편집 초안을 모두 지울까요? 저장한 파일은 유지됩니다.")) { try { localStorage.removeItem(settlementKey("draft")); } catch { /* storage unavailable */ } session.reset(); setResetCount(n => n + 1); } }}>정산 작업 초기화</button>
       <div className="dashboard-grid">
         <section className="portal-panel">
           <div className="filter-tabs">
@@ -1588,7 +1594,7 @@ function Settlement({ department, onRequest }: { department: string; onRequest: 
           </button>
         </section>
       </div>
-      <SettlementDraft department={department} mode={mode} amount={total} valid={!invalid && raw >= 0 && !missing && Number(mode === "출장" ? days : people) > 0} formula={mode === "출장" ? `${days || 0}일 × ${daily || 0}원 + 교통 ${transport || 0}원 + 숙박 ${lodging || 0}원 − 공제 ${deduction || 0}원` : `${people || 0} × ${unit || 0}원`} needsTransport={Number(transport) > 0} needsLodging={Number(lodging) > 0} />
+      <SettlementDraft key={resetCount} department={department} mode={mode} amount={total} valid={!invalid && raw >= 0 && !missing && Number(mode === "출장" ? days : people) > 0} formula={mode === "출장" ? `${days || 0}일 × ${daily || 0}원 + 교통 ${transport || 0}원 + 숙박 ${lodging || 0}원 − 공제 ${deduction || 0}원` : `${people || 0} × ${unit || 0}원`} needsTransport={Number(transport) > 0} needsLodging={Number(lodging) > 0} />
     </>
   );
 }
