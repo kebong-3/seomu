@@ -1,0 +1,18 @@
+const fs = require('fs');
+const ts = require('../node_modules/typescript');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const code = ts.transpileModule(fs.readFileSync('src/settlement-draft.tsx', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+const context = {exports:{},require:()=>({})};
+vm.runInNewContext(code, context);
+const {settlementChecks, printableDraft} = context.exports;
+assert.equal(settlementChecks('출장',false,false).length,2);
+assert.equal(settlementChecks('출장',true,false).length,3);
+assert.equal(settlementChecks('출장',true,true).length,4);
+assert.equal(settlementChecks('특근매식',true,true).length,3);
+const html = printableDraft('<script>alert("bad")</script>\n합성 초안 & 금액');
+assert.ok(!html.includes('<script>'));
+assert.ok(html.includes('&lt;script&gt;'));
+assert.ok(html.includes('&amp;'));
+assert.ok(html.includes('white-space:pre-wrap'));
+console.log('8 assertions passed: evidence applicability, HTML injection escaping, multiline printing.');

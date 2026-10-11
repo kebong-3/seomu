@@ -33,6 +33,7 @@ import {
 import type { Workspace, Request, Work, Submission } from "./workspace-store";
 import { DocumentWorkspace } from "./document-workspace";
 import "./workspace.css";
+import { SettlementDraft } from "./settlement-draft";
 
 type Page =
   | "today"
@@ -755,7 +756,7 @@ export function WorkspaceApp() {
             </>
           )}
           {page === "settlement" && (
-            <Settlement onRequest={() => startRequest("travel")} />
+            <Settlement department={data.department} onRequest={() => startRequest("travel")} />
           )}
           {page === "knowledge" && (
             <>
@@ -1459,7 +1460,7 @@ function WorkEditor({
     </div>
   );
 }
-function Settlement({ onRequest }: { onRequest: () => void }) {
+function Settlement({ department, onRequest }: { department: string; onRequest: () => void }) {
   const [mode, setMode] = useState("출장");
   const [days, setDays] = useState("1");
   const [daily, setDaily] = useState("");
@@ -1587,6 +1588,7 @@ function Settlement({ onRequest }: { onRequest: () => void }) {
           </button>
         </section>
       </div>
+      <SettlementDraft department={department} mode={mode} amount={total} valid={!invalid && raw >= 0 && !missing && Number(mode === "출장" ? days : people) > 0} formula={mode === "출장" ? `${days || 0}일 × ${daily || 0}원 + 교통 ${transport || 0}원 + 숙박 ${lodging || 0}원 − 공제 ${deduction || 0}원` : `${people || 0} × ${unit || 0}원`} needsTransport={Number(transport) > 0} needsLodging={Number(lodging) > 0} />
     </>
   );
 }
@@ -1788,3 +1790,4 @@ function Department({
     </>
   );
 }
+
