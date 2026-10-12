@@ -52,3 +52,34 @@ def test_provider_exception_content_is_never_recorded():
     report = run_evaluation(provider_factory=failing)
     assert 'SECRET_TOKEN' not in json.dumps(report)
     assert all(r['failure'] == 'configuration_or_execution_failed' for r in report['runs'])
+
+
+def test_mock_completes_both_representative_flows():
+    report = run_evaluation()
+    assert report['schema_version'] == 2
+    assert all(set(r['flows']) == {'answer', 'draft_request'} for r in report['runs'])
+    assert all(all(f['passed'] for f in r['flows'].values()) for r in report['runs'])
+
+
+import pytest
+
+@pytest.mark.parametrize('case', ['date', 'missing_field', 'audience', 'quote', 'structure', 'title'])
+def test_answer_success_cannot_hide_draft_failure(case):
+    from app.model_eval import SyntheticProvider
+    class Mutated(SyntheticProvider):
+        def generate(self, messages):
+            result = super().generate(messages)
+            if '최상위 키는 title, deadline, audience, fields' not in messages[0]['content']:
+                return result
+            proposal = json.loads(result.text)
+            if case == 'date': proposal['deadline']['value'] = '2026-10-21'
+            if case == 'missing_field': proposal['fields'].pop()
+            if case == 'audience': proposal['audience']['value'] = '다른부서 직원'
+            if case == 'quote': proposal['audience']['quote'] = '원문에 없는 조작 근거'
+            if case == 'title': proposal['title'] = None
+            if case == 'structure': proposal['unexpected'] = True
+            return ModelResult(json.dumps(proposal, ensure_ascii=False), result.model, 0, result.provider)
+    report = run_evaluation(provider_factory=Mutated)
+    assert not report['automated_checks_passed']
+    assert all(r['flows']['answer']['passed'] for r in report['runs'])
+    assert all(not r['flows']['draft_request']['passed'] for r in report['runs'])
