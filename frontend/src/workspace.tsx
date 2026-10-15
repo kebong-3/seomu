@@ -1,3 +1,4 @@
+import { RequestFollowup } from "./request-followup";
 import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -1211,6 +1212,7 @@ function RequestDetail({
           {error}
         </p>
       )}
+      <RequestFollowup key={r.id} request={r} employees={employees} />
       <div className="submission-table">
         <div className="submission-head">
           <span>직원 / 팀</span>
@@ -1802,4 +1804,3 @@ function Department({
     </>
   );
 }
-
