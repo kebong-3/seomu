@@ -67,9 +67,11 @@ function Badge({ status }: { status: string }) {
 
 export function DocumentWorkspace({
   initialView = "documents",
+  initialQuestion = "",
   onRequest,
 }: {
   initialView?: View;
+  initialQuestion?: string;
   onRequest?: (source: SourceRequest) => void;
 }) {
   const [view, setView] = useState<View>(initialView);
@@ -85,7 +87,7 @@ export function DocumentWorkspace({
   const [drafting,setDrafting]=useState(false);
   const [draftConfirmed,setDraftConfirmed]=useState(false);
   const [folder, setFolder] = useState("");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuestion);
   const [docFilter, setDocFilter] = useState("all");
   const [selected, setSelected] = useState<Doc | null>(null);
   const [job, setJob] = useState<Job | null>(null);

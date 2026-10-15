@@ -1,3 +1,6 @@
+import { DeskGuide } from "./desk-guide";
+import { MergeDesk, MealDesk, OvertimePairDesk } from "./desk-tables";
+import "./desk.css";
 import { ProcedureGuide } from "./procedure-guide";
 import { RequestFollowup } from "./request-followup";
 import { useSettlementSession, settlementKey } from "./settlement-session";
@@ -41,6 +44,9 @@ import {AISettings} from './ai-settings';
 import type {SourceRequest} from './types';
 
 type Page =
+  | "pair"
+  | "merge"
+  | "meal"
   | "procedures"
   | "ai"
   | "today"
@@ -54,12 +60,15 @@ type Page =
   | "calendar"
   | "tools";
 const menus = [
-  { id: "procedures", label: "규정·업무 절차", icon: BookOpen },
   { id: "today", label: "오늘", icon: LayoutDashboard },
+  { id: "knowledge", label: "서무 실무 안내", icon: BookOpen },
+  { id: "merge", label: "엑셀 취합·대조", icon: Files },
+  { id: "pair", label: "승인·실적 파일 연결", icon: ClipboardList },
+  { id: "meal", label: "초근·매식비 점검", icon: Clock },
   { id: "requests", label: "요청·취합", icon: Send },
   { id: "education", label: "교육·증빙", icon: GraduationCap },
   { id: "settlement", label: "정산 도우미", icon: Calculator },
-  { id: "knowledge", label: "서무 지식", icon: BookOpen },
+  { id: "procedures", label: "규정·업무 절차", icon: BookOpen },
   { id: "department", label: "부서 설정", icon: Settings },
 ] as const;
 const states = {
@@ -75,6 +84,7 @@ export function WorkspaceApp() {
   const [page, setPage] = useState<Page>("today");
   const [category, setCategory] = useState("collection");
   const [term, setTerm] = useState("");
+  const [searchSeed, setSearchSeed] = useState("");
   const [notice, setNotice] = useState("");
   const [requestSeed, setRequestSeed] = useState<
     SourceRequest | undefined
@@ -314,16 +324,21 @@ export function WorkspaceApp() {
                 <div>
                   <span className="welcome-icon">✦</span>
                   <div>
-                    <b>서무의 모든 일이 모이는 곳</b>
+                    <b>어떤 업무부터 처리할까요?</b>
                     <p>
-                      교육·복무·회계·물품부터 기록물·감사까지, 필요한 업무를
-                      골라 시작하세요.
+                      16개 실무 흐름에서 준비자료와 처리순서를 확인하고, 엑셀 취합·초근 대조로 바로 이어가세요.
                     </p>
                   </div>
                 </div>
                 <button onClick={() => navigate("knowledge")}>
-                  업무 둘러보기 <ArrowRight size={17} />
+                  실무 안내 열기 <ArrowRight size={17} />
                 </button>
+              </div>
+              <div className="desk-launchers">
+                <button onClick={()=>navigate('knowledge')}><BookOpen/><b>업무별 처리안내</b><span>16개 흐름 · 담당·준비자료·서식</span></button>
+                <button onClick={()=>navigate('merge')}><Files/><b>엑셀 취합·누락 대조</b><span>열 연결 · 중복 · 미회신 찾기</span></button>
+                <button onClick={()=>navigate('pair')}><ClipboardList/><b>승인·실적 파일 연결</b><span>두 자료 연결 · 한쪽 누락 찾기</span></button>
+                <button onClick={()=>navigate('meal')}><Clock/><b>초근·매식비 점검</b><span>승인·실적 · 식사·증빙 확인</span></button>
               </div>
               <div className="portal-stats">
                 {[
@@ -454,7 +469,7 @@ export function WorkspaceApp() {
                 <section className="portal-panel">
                   <div className="panel-title">
                     <h2>자주 하는 업무</h2>
-                    <span className="muted small">클릭하면 요청 양식 생성</span>
+                    <span className="muted small">클릭하면 처리안내·서식</span>
                   </div>
                   <div className="quick-grid">
                     {[
@@ -467,7 +482,7 @@ export function WorkspaceApp() {
                     ].map((id) => {
                       const c = categories.find((x) => x.id === id)!;
                       return (
-                        <button key={id} onClick={() => startRequest(id)}>
+                        <button key={id} onClick={() => {setCategory(id);navigate("knowledge");}}>
                           <span>{c.icon}</span>
                           <b>{c.name}</b>
                           <small>{c.summary}</small>
@@ -651,6 +666,7 @@ export function WorkspaceApp() {
           )}
           {page === "tools" && (
             <>
+              <div className="local-note">업무별 준비자료와 처리순서는 실무 안내에서 확인할 수 있습니다. <button className="secondary" onClick={()=>navigate("knowledge")}>상세 실무 안내 열기</button></div>
               <div className="portal-heading">
                 <div>
                   <span className="kicker">업무별 도구</span>
@@ -768,77 +784,13 @@ export function WorkspaceApp() {
           {page === "settlement" && (
             <Settlement department={data.department} onRequest={() => startRequest("travel")} />
           )}
-          {page === "knowledge" && (
-            <>
-              <div className="portal-heading">
-                <div>
-                  <span className="kicker">처리순서와 근거를 함께</span>
-                  <h1>서무 지식·업무편람</h1>
-                  <p>
-                    지자체·중앙기관의 공개 업무분장을 바탕으로 정리했습니다.
-                    기관별 분장은 다를 수 있습니다.
-                  </p>
-                </div>
-                <button
-                  className="secondary"
-                  onClick={() => navigate("search")}
-                >
-                  <Search size={18} />내 문서에서 근거 찾기
-                </button>
-              </div>
-              <label className="knowledge-search">
-                <Search size={19} />
-                <input
-                  placeholder="예: 당직, 여비, 인수인계, 정보공개"
-                  aria-label="서무 업무 검색"
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                />
-              </label>
-              <div className="category-grid">
-                {categories
-                  .filter((c) => (c.name + c.tasks.join("")).includes(term))
-                  .map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        setCategory(c.id);
-                        navigate("tools");
-                      }}
-                    >
-                      <span>{c.icon}</span>
-                      <div>
-                        <b>{c.name}</b>
-                        <p>
-                          {c.tasks
-                            .filter((t) => !term || t.includes(term))
-                            .join(" · ") || c.summary}
-                        </p>
-                      </div>
-                      <ChevronRight size={17} />
-                    </button>
-                  ))}
-              </div>
-              <section className="portal-panel sources-panel">
-                <h2>조사 근거·참고 사례</h2>
-                <p className="muted">
-                  확인일 2026.10.10 · 공개자료의 업무 범위를 메뉴 설계에
-                  반영했습니다. 법적 인정기준·금액은 이 목록에서 확정하지
-                  않습니다.
-                </p>
-                {sources.map((s) => (
-                  <a key={s.url} href={s.url} target="_blank" rel="noreferrer">
-                    <BookOpen size={18} />
-                    <div>
-                      <b>{s.title}</b>
-                      <p>{s.note}</p>
-                    </div>
-                    <ArrowRight size={17} />
-                  </a>
-                ))}
-              </section>
-            </>
-          )}
+          {page === "knowledge" && <DeskGuide initialCategory={category} institution={data.institution} department={data.department}
+            onRequest={(b, seed) => {setCategory(b.category);setRequestSeed(seed);setNewRequest(true);}}
+            onWork={(b, deadline) => {const w:Work={id:uid(),title:b.title,category:b.category,deadline,owner:'',repeat:'없음',checks:b.steps.map(s=>s.action+' → '+s.result),done:b.steps.map(()=>false)};setData(prev=>({...prev,works:[...prev.works,w]}));}}
+            onTool={navigate} onSearch={q=>{setSearchSeed(q);navigate('search');}} />}
+          <div hidden={page !== "merge"}><MergeDesk /></div>
+          <div hidden={page !== "meal"}><MealDesk /></div>
+          <div hidden={page !== "pair"}><OvertimePairDesk /></div>
           {page==='procedures'&&<ProcedureGuide institution={data.institution}/>}
           {page==='ai'&&<AISettings onConnect={()=>{navigate('documents');setDocMode('settings');}}/>}
           {page === "department" && (
@@ -895,7 +847,7 @@ export function WorkspaceApp() {
                 ))}
               </div>
               <div className="document-module">
-                <DocumentWorkspace
+                <DocumentWorkspace initialQuestion={searchSeed}
                   initialView={docMode}
                   onRequest={(source) => {
                     setRequestSeed(source);
