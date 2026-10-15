@@ -1,3 +1,4 @@
+import { ProcedureGuide } from "./procedure-guide";
 import { RequestFollowup } from "./request-followup";
 import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +41,7 @@ import {AISettings} from './ai-settings';
 import type {SourceRequest} from './types';
 
 type Page =
+  | "procedures"
   | "ai"
   | "today"
   | "requests"
@@ -52,6 +54,7 @@ type Page =
   | "calendar"
   | "tools";
 const menus = [
+  { id: "procedures", label: "규정·업무 절차", icon: BookOpen },
   { id: "today", label: "오늘", icon: LayoutDashboard },
   { id: "requests", label: "요청·취합", icon: Send },
   { id: "education", label: "교육·증빙", icon: GraduationCap },
@@ -836,6 +839,7 @@ export function WorkspaceApp() {
               </section>
             </>
           )}
+          {page==='procedures'&&<ProcedureGuide institution={data.institution}/>}
           {page==='ai'&&<AISettings onConnect={()=>{navigate('documents');setDocMode('settings');}}/>}
           {page === "department" && (
             <Department
