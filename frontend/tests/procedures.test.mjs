@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const js=ts.transpileModule(readFileSync(new URL('../src/procedures.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const context={exports:{}};vm.runInNewContext(js,context);
+const {validProcedure,procedureIssues,findProcedures,sampleProcedure}=context.exports;
+assert.equal(validProcedure(sampleProcedure),true);
+assert.equal(validProcedure({...sampleProcedure,steps:[{action:'할 일'}]}),false);
+assert.equal(validProcedure({...sampleProcedure,id:''}),false);
+assert.equal(procedureIssues(sampleProcedure).length,0);
+assert.equal(procedureIssues({...sampleProcedure,text:'근거 변경'}).length,3);
+assert.equal(findProcedures([sampleProcedure],'교육 취합').length,1);
+assert.equal(findProcedures([sampleProcedure],'없는검색어').length,0);
+assert.equal(validProcedure({...sampleProcedure,steps:Array(31).fill(sampleProcedure.steps[0])}),false);
+console.log('Procedures: schema, missing fields, source change, matching, step limit passed');
