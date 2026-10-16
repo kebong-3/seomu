@@ -1,3 +1,4 @@
+import {RequestQueue} from './request-queue';
 import { RequestFollowup } from "./request-followup";
 import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
@@ -374,6 +375,7 @@ export function WorkspaceApp() {
                   </button>
                 ))}
               </div>
+              <RequestQueue requests={data.requests} onOpen={id=>{navigate("requests");setRequestId(id);}} />
               <div className="workflow-bar">
                 {[
                   "공문 등록",

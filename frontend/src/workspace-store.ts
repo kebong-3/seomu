@@ -156,3 +156,31 @@ export function buildFollowupText(request: Request, employees: Employee[], kind:
     return `받는 분: ${employee?.name || "직원 확인 필요"} (${employee?.team || "팀 미지정"})\n확인 사유: ${reasons.join(" · ")}\n필요 항목: ${missing.length ? missing.join(" / ") : row.state === "pending" ? request.fields.join(" / ") || "제출항목 확인 필요" : "검토 메모에 따른 보완"}\n서무 검토 메모: ${row.note.trim() || "없음 · 추가 보완사항 확인"}\n제출기한: ${request.deadline.trim() || "확인 필요"}\n요청드린 자료의 해당 항목을 확인해 담당자에게 제출해 주세요.`;
   }).join("\n\n────────────────\n\n");
 }
+
+export function validQueueDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00Z");
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === value;
+}
+export function requestQueue(requests: Request[], asOf: string) {
+  if (!validQueueDate(asOf)) return [];
+  return requests.flatMap(request => {
+    const active = request.rows.filter(row => row.state !== "approved");
+    if (!active.length && request.rows.length) return [];
+    const pending = active.filter(row => row.state === "pending").length;
+    const revision = active.filter(row => row.state === "revision").length;
+    const missing = active.filter(row => rowIssues(row, request.fields).length > 0).length;
+    const review = active.filter(row => row.state === "submitted" && !rowIssues(row, request.fields).length).length;
+    const timing = !validQueueDate(request.deadline) ? "unknown" : request.deadline < asOf ? "overdue" : request.deadline === asOf ? "today" : "upcoming";
+    return [{id:request.id,title:request.title,deadline:request.deadline,timing,pending,revision,missing,review,active:active.length,unassigned:!request.rows.length,
+      next:!request.rows.length ? "제출 대상 직원 설정" : revision ? "보완 메모 확인 후 후속 안내" : pending || missing ? "미제출·누락 항목 확인 후 안내" : "제출자료 검토 후 확인 처리"}];
+  }).sort((a,b) => {
+    const rank: Record<string,number> = {overdue:0,today:1,unknown:2,upcoming:3};
+    return rank[a.timing]-rank[b.timing] || a.deadline.localeCompare(b.deadline) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id);
+  });
+}
+export function requestQueueCsv(requests: Request[], asOf: string) {
+  const labels: Record<string,string>={overdue:"기한 경과",today:"오늘 마감",unknown:"기한 확인",upcoming:"예정"};
+  return csv([["기준일","요청명","입력 기한","기한 상태","미제출","보완","누락 포함","검토 대기","다음 행동"],
+    ...requestQueue(requests,asOf).map(item=>[asOf,item.title,item.deadline,labels[item.timing],String(item.pending),String(item.revision),String(item.missing),String(item.review),item.next])]);
+}
