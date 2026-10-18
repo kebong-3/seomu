@@ -28,7 +28,7 @@ class OpenAICompatibleProvider:
         started = perf_counter()
         with httpx.Client(timeout=60, follow_redirects=False) as client:
             response = client.post(s.llm_url.rstrip('/') + '/chat/completions', headers=headers, json={
-                'model': s.llm_model, 'temperature': 0, 'max_tokens': 1300, 'messages': messages,
+                'model': s.llm_model, 'temperature': 0, 'max_tokens': 5000, 'messages': messages,
             })
             response.raise_for_status()
             content = response.json()['choices'][0]['message']['content']

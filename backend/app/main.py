@@ -19,6 +19,7 @@ from .retrieval import search, deadline_proposals
 from .assistant import answer
 from .model_provider import provider_options
 from .request_draft import draft_request
+from .procedure_assistant import draft_procedure, analyze_situation
 
 
 class Question(BaseModel):
@@ -47,6 +48,29 @@ class TaskState(BaseModel):
 
 class DraftRequest(BaseModel):
     provider: str = Field(pattern='^(gemma|gpt|compatible)$')
+
+
+class ProcedureDraft(DraftRequest):
+    text: str = Field(min_length=10, max_length=24000)
+    source: str = Field(min_length=1, max_length=1000)
+    version: str = Field(min_length=1, max_length=1000)
+    institution: str = Field(min_length=1, max_length=1000)
+
+
+class SituationOption(BaseModel):
+    value: str = Field(pattern='^[a-z][a-z0-9_]{0,59}$')
+    label: str = Field(min_length=1, max_length=200)
+
+
+class SituationQuestion(BaseModel):
+    id: str = Field(pattern='^[a-z][a-z0-9_]{0,59}$')
+    label: str = Field(min_length=1, max_length=300)
+    options: list[SituationOption] = Field(min_length=2, max_length=6)
+
+
+class SituationRequest(DraftRequest):
+    situation: str = Field(min_length=2, max_length=4000)
+    questions: list[SituationQuestion] = Field(max_length=8)
 
 
 def create_app(settings=None):
@@ -197,6 +221,14 @@ def create_app(settings=None):
     @app.post('/api/documents/{doc_id}/request-draft',dependencies=auth)
     def request_draft(doc_id, body:DraftRequest):
         return draft_request(service,doc_id,body.provider)
+
+    @app.post('/api/procedures/draft', dependencies=auth)
+    def procedure_draft(body:ProcedureDraft):
+        return draft_procedure(settings, body)
+
+    @app.post('/api/procedures/situation', dependencies=auth)
+    def procedure_situation(body:SituationRequest):
+        return analyze_situation(settings, body)
 
     @app.get('/api/tasks',dependencies=auth)
     def tasks():

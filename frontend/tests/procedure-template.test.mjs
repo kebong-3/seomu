@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {webcrypto} from 'node:crypto';
+import vm from 'node:vm';
+import ts from 'typescript';
+import {DOMParser,XMLSerializer} from '@xmldom/xmldom';
+import JSZip from 'jszip';
+import ExcelJS from 'exceljs';
+const element=new DOMParser().parseFromString('<r><p/></r>','application/xml').documentElement;
+if(!('parentElement' in element))Object.defineProperty(Object.getPrototypeOf(element),'parentElement',{get(){return this.parentNode?.nodeType===1?this.parentNode:null;}});
+const nativeRequire=createRequire(import.meta.url),cache=new Map();
+function load(name){if(cache.has(name))return cache.get(name);const context={exports:{},structuredClone,crypto:webcrypto,Date,Blob,URL,DOMParser,XMLSerializer,TextDecoder,setTimeout,console,require:n=>n.startsWith('./')?load(n.slice(2)):nativeRequire(n)};vm.runInNewContext(ts.transpileModule(readFileSync(new URL(`../src/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,context);cache.set(name,context.exports);return context.exports;}
+const {inspectTemplate,renderTemplate,templateMissing}=load('procedure-template');
+const file=(name,data)=>({name,size:data.byteLength,arrayBuffer:async()=>ArrayBuffer.isView(data)?data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength):data});
+let wb=new ExcelJS.Workbook(),s=wb.addWorksheet('기관서식');s.getCell('A1').value='기관: {{기관명}}';s.getCell('A1').font={bold:true};s.mergeCells('A2:B2');s.getCell('A2').value={richText:[{text:'{{담',font:{color:{argb:'FFFF0000'}}},{text:'당자}}'}]};s.getCell('C1').value={formula:'1+1',result:2};
+const raw=await wb.xlsx.writeBuffer(),original=Buffer.from(raw);const template=await inspectTemplate(file('기관서식.xlsx',raw),'procedure');
+assert.deepEqual(Array.from(template.fields).sort(),['기관명','담당자']);assert.equal(templateMissing(template,{'기관명':'기관'}).length,1);
+const blob=await renderTemplate(template,{'기관명':'가상 기관','담당자':'=HYPERLINK("test")'});wb=new ExcelJS.Workbook();await wb.xlsx.load(await blob.arrayBuffer());s=wb.getWorksheet('기관서식');assert.equal(s.getCell('A1').value,'기관: 가상 기관');assert.equal(s.getCell('A1').font.bold,true);assert.equal(s.getCell('A2').text,'=HYPERLINK("test")');assert.equal(s.getCell('A2').type,ExcelJS.ValueType.RichText);assert.equal(s.getCell('C1').formula,'1+1');assert.deepEqual(Buffer.from(raw),original);
+const zip=new JSZip();zip.file('mimetype','application/hwp+zip',{compression:'STORE'});zip.file('Contents/section0.xml',`<?xml version="1.0"?><hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run charPrIDRef="1"><hp:t>기관 {{기</hp:t></hp:run><hp:run charPrIDRef="2"><hp:t>관명}} / {{담당자}}</hp:t></hp:run></hp:p><hp:p><hp:run><hp:t>{{기관명}} + {{기관명}}</hp:t><hp:tbl><hp:p><hp:run><hp:t>{{담당자}}</hp:t></hp:run></hp:p></hp:tbl></hp:run></hp:p></hs:sec>`);zip.file('Contents/header.xml','<header/>');zip.file('Scripts/sourceScripts.js','function unsafe(){}');zip.file('Preview/PrvText.txt','이전 담당자');
+const hwpx=await zip.generateAsync({type:'arraybuffer'});const h=await inspectTemplate(file('기관서식.hwpx',hwpx),'procedure');assert.deepEqual(Array.from(h.fields).sort(),['기관명','담당자']);
+const filled=await renderTemplate(h,{'기관명':'가상 & 기관','담당자':'홍길동 <담당>'});const outputBuffer=await filled.arrayBuffer();const output=await JSZip.loadAsync(outputBuffer);const xml=await output.file('Contents/section0.xml').async('string');const doc=new DOMParser().parseFromString(xml,'application/xml');assert.equal(doc.getElementsByTagName('parsererror').length,0);assert.ok(doc.documentElement.textContent.includes('기관 가상 & 기관 / 홍길동 <담당>'));assert.ok(doc.documentElement.textContent.includes('가상 & 기관 + 가상 & 기관'));assert.ok(!xml.includes('{{'));assert.ok(xml.includes('charPrIDRef="2"'));assert.equal(output.file('Preview/PrvText.txt'),null);assert.equal(await output.file('Scripts/sourceScripts.js').async('string'),'');
+const bytes=new DataView(outputBuffer);assert.equal(bytes.getUint16(8,true),0);const nameLen=bytes.getUint16(26,true);assert.equal(new TextDecoder().decode(new Uint8Array(outputBuffer,30,nameLen)),'mimetype');assert.equal(await output.file('Contents/header.xml').async('string'),'<header/>');
+await assert.rejects(()=>renderTemplate(h,{'기관명':'기관'}));await assert.rejects(()=>inspectTemplate(file('기존.hwp',hwpx),'procedure'));
+const macro=new JSZip();macro.file('xl/vbaProject.bin','fake');const macroBuffer=await macro.generateAsync({type:'arraybuffer'});await assert.rejects(()=>inspectTemplate(file('macro.xlsx',macroBuffer),'procedure'));
+console.log('Templates: editable XLSX values/styles/merged rich text, formula-like strings, split HWPX placeholders, XML escaping, original integrity, ordered mimetype, stale preview removal, script exclusion, missing-value guards passed');

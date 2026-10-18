@@ -69,10 +69,12 @@ export function DocumentWorkspace({
   initialView = "documents",
   initialQuestion = "",
   onRequest,
+  onProcedure,
 }: {
   initialView?: View;
   initialQuestion?: string;
   onRequest?: (source: SourceRequest) => void;
+  onProcedure?: (doc:Doc) => void;
 }) {
   const [view, setView] = useState<View>(initialView);
   const [connected, setConnected] = useState(false);
@@ -1368,6 +1370,7 @@ export function DocumentWorkspace({
             {onRequest&&<div className="ai-draft-tools"><AISelector options={status?.ai_providers} value={aiProvider} onChange={setAIProvider}/><button className="primary" disabled={drafting||aiProvider==='evidence'||!selected.block_count} onClick={()=>void draftRequest()}><Sparkles size={16}/>{drafting?'원문을 읽는 중':'AI로 요청 초안'}</button></div>}
             {aiDraft&&aiDraft.source_id===selected.id&&<section className="ai-draft-review"><h3>공문에서 추출한 요청 초안</h3><p className="small muted">{aiDraft.model_run.provider} · {aiDraft.model_run.model}</p>{([{name:'요청 제목',field:aiDraft.title},{name:'제출기한',field:aiDraft.deadline},{name:'제출 대상',field:aiDraft.audience},...aiDraft.fields.map(f=>({name:'제출항목',field:f}))]).map((item,i)=><article key={i}><small>{item.name}</small><b>{item.field?.value||'확인 필요 · 원문에서 직접 지정'}</b>{item.field&&<><p>{item.field.quote}</p><small>{item.field.locator}</small></>}</article>)}{aiDraft.warnings.map(w=><p className="caption" key={w}>{w}</p>)}<label className="checkbox"><input type="checkbox" checked={draftConfirmed} onChange={e=>setDraftConfirmed(e.target.checked)}/>원문과 기한·대상·제출항목을 확인했습니다.</label><button className="primary" disabled={!draftConfirmed||drafting} onClick={()=>{onRequest?.({title:aiDraft.title?.value||selected.name+' 자료 제출',reference:aiDraft.source_path+' · v'+aiDraft.source_version,deadline:aiDraft.deadline?.value||'',fields:aiDraft.fields.map(f=>f.value),aiSuggested:true});setAIDraft(null);setSelected(null);}}>확인한 내용으로 요청 양식 열기</button></section>}
             <div className="drawer-actions">
+              {onProcedure&&<button className="primary" disabled={!selected.block_count} onClick={()=>{onProcedure(selected);setSelected(null);}}>이 규정으로 업무 절차 만들기</button>}
               {onRequest && (
                 <button
                   className="primary"

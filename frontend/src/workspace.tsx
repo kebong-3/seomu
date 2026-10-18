@@ -1,3 +1,5 @@
+import {SituationAssistant} from './situation-assistant';
+import type {ProcedureSeed} from './procedure-draft-builder';
 import {RequestQueue} from './request-queue';
 import { DeskGuide } from "./desk-guide";
 import { MergeDesk, MealDesk, OvertimePairDesk } from "./desk-tables";
@@ -8,6 +10,7 @@ import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
+  Sparkles,
   Send,
   GraduationCap,
   Calculator,
@@ -45,6 +48,7 @@ import {AISettings} from './ai-settings';
 import type {SourceRequest} from './types';
 
 type Page =
+  | "assistant"
   | "pair"
   | "merge"
   | "meal"
@@ -62,6 +66,7 @@ type Page =
   | "tools";
 const menus = [
   { id: "today", label: "오늘", icon: LayoutDashboard },
+  { id: "assistant", label: "상황별 업무 도우미", icon: Sparkles },
   { id: "knowledge", label: "서무 실무 안내", icon: BookOpen },
   { id: "merge", label: "엑셀 취합·대조", icon: Files },
   { id: "pair", label: "승인·실적 파일 연결", icon: ClipboardList },
@@ -86,6 +91,7 @@ export function WorkspaceApp() {
   const [category, setCategory] = useState("collection");
   const [term, setTerm] = useState("");
   const [searchSeed, setSearchSeed] = useState("");
+  const [procedureSeed,setProcedureSeed]=useState<ProcedureSeed>();
   const [notice, setNotice] = useState("");
   const [requestSeed, setRequestSeed] = useState<
     SourceRequest | undefined
@@ -310,37 +316,28 @@ export function WorkspaceApp() {
               <div className="portal-heading">
                 <div>
                   <span className="kicker">오늘의 서무</span>
-                  <h1>오늘 확인할 일, 한눈에.</h1>
-                  <p>공문에서 시작해 자료 요청, 취합, 제출까지 이어가세요.</p>
+                  <h1>상황을 말하면, 할 일과 서류가 준비됩니다.</h1>
+                  <p>기관 규정에 맞는 처리순서를 찾고, 이미 있는 자료로 문서 초안을 만드세요.</p>
                 </div>
                 <button
                   className="primary"
-                  onClick={() => startRequest("collection")}
+                  onClick={() => navigate("assistant")}
                 >
                   <Plus size={18} />
-                  자료 요청 만들기
+                  상황으로 업무 시작
                 </button>
               </div>
-              <div className="welcome-strip">
-                <div>
-                  <span className="welcome-icon">✦</span>
-                  <div>
-                    <b>어떤 업무부터 처리할까요?</b>
-                    <p>
-                      16개 실무 흐름에서 준비자료와 처리순서를 확인하고, 엑셀 취합·초근 대조로 바로 이어가세요.
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => navigate("knowledge")}>
-                  실무 안내 열기 <ArrowRight size={17} />
-                </button>
+              <div className="assistant-home-actions">
+                <button onClick={()=>navigate('assistant')}><Sparkles size={24}/><b>상황 말하고 시작</b><span>출장·물품 등 현재 상황에 맞는 할 일과 필요한 서류</span></button>
+                <button onClick={()=>navigate('procedures')}><BookOpen size={24}/><b>규정에서 절차 준비</b><span>기관 관리자가 한 번 검토해 함께 쓰는 기준</span></button>
+                <button onClick={()=>navigate('assistant')}><Clock size={24}/><b>하던 일 계속</b><span>상황·입력값·처리 기록을 다시 쓰지 않고 이어하기</span></button>
               </div>
-              <div className="desk-launchers">
+              <details className="portal-panel"><summary>취합·대조 실무 도구 바로가기</summary><div className="desk-launchers">
                 <button onClick={()=>navigate('knowledge')}><BookOpen/><b>업무별 처리안내</b><span>16개 흐름 · 담당·준비자료·서식</span></button>
                 <button onClick={()=>navigate('merge')}><Files/><b>엑셀 취합·누락 대조</b><span>열 연결 · 중복 · 미회신 찾기</span></button>
                 <button onClick={()=>navigate('pair')}><ClipboardList/><b>승인·실적 파일 연결</b><span>두 자료 연결 · 한쪽 누락 찾기</span></button>
                 <button onClick={()=>navigate('meal')}><Clock/><b>초근·매식비 점검</b><span>승인·실적 · 식사·증빙 확인</span></button>
-              </div>
+              </div></details>
               <div className="portal-stats">
                 {[
                   {
@@ -793,7 +790,8 @@ export function WorkspaceApp() {
           <div hidden={page !== "merge"}><MergeDesk /></div>
           <div hidden={page !== "meal"}><MealDesk /></div>
           <div hidden={page !== "pair"}><OvertimePairDesk /></div>
-          {page==='procedures'&&<ProcedureGuide institution={data.institution}/>}
+          {page==='assistant'&&<SituationAssistant institution={data.institution} onManage={()=>navigate('procedures')} onDocuments={()=>navigate('documents')} onTool={navigate}/>}
+          {page==='procedures'&&<ProcedureGuide institution={data.institution} seed={procedureSeed} onConnect={()=>navigate('documents')}/>}
           {page==='ai'&&<AISettings onConnect={()=>{navigate('documents');setDocMode('settings');}}/>}
           {page === "department" && (
             <Department
@@ -849,7 +847,7 @@ export function WorkspaceApp() {
                 ))}
               </div>
               <div className="document-module">
-                <DocumentWorkspace initialQuestion={searchSeed}
+                <DocumentWorkspace onProcedure={doc=>{setProcedureSeed({doc});navigate('procedures');}} initialQuestion={searchSeed}
                   initialView={docMode}
                   onRequest={(source) => {
                     setRequestSeed(source);

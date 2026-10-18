@@ -4,8 +4,12 @@
 .venv/
 .vercel/
 backend/data/
+/data/
 
 work/
 .env
 .env.*
 !.env.example
+
+# Rebuilt by Vercel, Docker and both local start scripts
+frontend/dist/
