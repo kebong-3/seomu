@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const cache={};function load(file){if(cache[file])return cache[file];const context={exports:{},require:path=>load(path.replace('./','')),Set};vm.runInNewContext(ts.transpileModule(readFileSync(new URL(`../src/${file}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);return cache[file]=context.exports;}
+const {sampleProcedure:p,procedureKey}=load('procedures');const {emptyProgress,procedureSnapshot,currentRecord,progressKey}=load('procedure-progress');const {procedureBundle,parseProcedureBundle,planProcedureImport,persistProcedureImport}=load('procedure-transfer');
+const progress={...emptyProgress(),selected:p.id,records:{[p.id]:{snapshot:procedureSnapshot(p),checks:[0],note:'합성 업무건'}}};
+const bundle=procedureBundle([p],progress);const plan=planProcedureImport(bundle,[],emptyProgress());
+assert.equal(plan.accepted.length,1);assert.equal(plan.progress.records[p.id].checks.length,0);assert.equal(plan.progress.records[p.id].note,'합성 업무건');
+assert.equal(planProcedureImport(bundle,[p],progress).excluded.length,1);
+assert.equal(planProcedureImport(bundle,[{...p,id:'other',title:' '+p.title+' '}],emptyProgress()).accepted.length,0);
+assert.throws(()=>parseProcedureBundle(JSON.stringify({...bundle,procedures:[p,p]})));
+assert.throws(()=>parseProcedureBundle('x'.repeat(2000001)));
+assert.throws(()=>parseProcedureBundle(JSON.stringify({...bundle,version:2})));
+assert.throws(()=>parseProcedureBundle(JSON.stringify({...bundle,progress:{...progress,records:{oops:progress.records[p.id]}}})));
+const stale=procedureBundle([p],{...progress,records:{[p.id]:{...progress.records[p.id],snapshot:'older basis'}}});
+assert.equal(currentRecord(p,planProcedureImport(stale,[],emptyProgress()).progress.records[p.id]).stale,true);
+const data=new Map([[procedureKey,'old templates'],[progressKey,'old progress']]);let writes=0;const storage={getItem:k=>data.get(k)??null,setItem(k,v){if(++writes===2)throw Error('quota');data.set(k,v);},removeItem:k=>data.delete(k)};
+assert.equal(persistProcedureImport(storage,plan.items,plan.progress).ok,false);assert.equal(data.get(procedureKey),'old templates');assert.equal(data.get(progressKey),'old progress');
+const broken={getItem:()=>null,setItem:()=>{throw Error('blocked')},removeItem:()=>{throw Error('blocked')}};
+assert.equal(persistProcedureImport(broken,[],emptyProgress()).rollbackFailed,true);
+console.log('procedure transfer: guards, conflicts, check reset, stale basis, storage rollback passed');
+const orphanPlan=planProcedureImport(bundle,[],{...emptyProgress(),records:{orphan:progress.records[p.id]}});assert.equal(Object.keys(orphanPlan.progress.records).includes('orphan'),false);
+let invalidWrites=0;assert.equal(persistProcedureImport({getItem:()=>null,setItem(){invalidWrites++},removeItem(){}},[p,p],emptyProgress()).ok,false);assert.equal(invalidWrites,0);
+assert.throws(()=>parseProcedureBundle(JSON.stringify({...bundle,progress:undefined})));
