@@ -87,7 +87,7 @@ assert.equal(validQueueDate('2024-02-29'),true);
 assert.equal(validQueueDate('2026-10-16T10:00'),false);
 const queueRequest=(id,deadline,rows)=>({id,title:id,deadline,fields:['항목'],rows});
 const queueRow=(state,filled=true)=>({employeeId:'synthetic',state,note:'private-note',values:filled?{'항목':'PRIVATE_VALUE'}:{}});
-const queueInput=[queueRequest('future','2026-10-20',[queueRow('pending')]),queueRequest('done','2026-10-01',[queueRow('approved',false)]),queueRequest('invalid','2026-02-30',[queueRow('submitted')]),queueRequest('today','2026-10-16',[queueRow('submitted',false),queueRow('revision')]),queueRequest('late','2026-10-10',[queueRow('submitted')]),queueRequest('unassigned','',[])];
+const queueInput=[queueRequest('future','2026-10-20',[queueRow('pending')]),queueRequest('done','2026-10-01',[queueRow('approved')]),queueRequest('invalid','2026-02-30',[queueRow('submitted')]),queueRequest('today','2026-10-16',[queueRow('submitted',false),queueRow('revision')]),queueRequest('late','2026-10-10',[queueRow('submitted')]),queueRequest('unassigned','',[])];
 const queueBefore=JSON.stringify(queueInput);
 const queueResult=requestQueue(queueInput,'2026-10-16');
 assert.equal(queueResult.map(x=>x.id).join(','),'late,today,unassigned,invalid,future');

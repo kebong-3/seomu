@@ -6,6 +6,7 @@ import { MergeDesk, MealDesk, OvertimePairDesk } from "./desk-tables";
 import "./desk.css";
 import { ProcedureGuide } from "./procedure-guide";
 import { RequestFollowup } from "./request-followup";
+import { RequestReadiness } from "./request-readiness";
 import { useSettlementSession, settlementKey } from "./settlement-session";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -39,6 +40,7 @@ import {
   csv,
   rowIssues,
   saveFile,
+  updateRequestRow,
 } from "./workspace-store";
 import type { Workspace, Request, Work, Submission } from "./workspace-store";
 import { DocumentWorkspace } from "./document-workspace";
@@ -124,11 +126,11 @@ export function WorkspaceApp() {
   const work = data.works.find((w) => w.id === workId);
   const outstanding = data.requests
     .flatMap((r) => r.rows.map((row) => ({ r, row })))
-    .filter((x) => x.row.state !== "approved");
+    .filter((x) => x.row.state !== "approved" || rowIssues(x.row, x.r.fields).length > 0);
   const openWorks = data.works.filter((w) => !w.done.every(Boolean));
   const due = [
     ...data.requests
-      .filter((r) => r.rows.some((s) => s.state !== "approved"))
+      .filter((r) => r.rows.some((s) => s.state !== "approved" || rowIssues(s, r.fields).length > 0))
       .map((r) => ({
         id: r.id,
         title: r.title,
@@ -343,7 +345,7 @@ export function WorkspaceApp() {
                   {
                     label: "진행 중인 요청",
                     value: data.requests.filter((r) =>
-                      r.rows.some((x) => x.state !== "approved"),
+                      r.rows.some((x) => x.state !== "approved" || rowIssues(x, r.fields).length > 0),
                     ).length,
                     icon: Send,
                     color: "indigo",
@@ -610,7 +612,7 @@ export function WorkspaceApp() {
                           </p>
                           <progress
                             value={
-                              r.rows.filter((x) => x.state === "approved")
+                              r.rows.filter((x) => x.state === "approved" && !rowIssues(x, r.fields).length)
                                 .length
                             }
                             max={Math.max(1, r.rows.length)}
@@ -619,7 +621,7 @@ export function WorkspaceApp() {
                             <span>
                               확인 완료{" "}
                               {
-                                r.rows.filter((x) => x.state === "approved")
+                                r.rows.filter((x) => x.state === "approved" && !rowIssues(x, r.fields).length)
                                   .length
                               }{" "}
                               / {r.rows.length}명
@@ -1088,15 +1090,13 @@ function RequestDetail({
   onBack: () => void;
   onExport: () => void;
 }) {
-  const [active, setActive] = useState("");
+  const [active, setActive] = useState<number | null>(null);
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
-  const row = r.rows.find((x) => x.employeeId === active);
+  const row = active === null ? undefined : r.rows[active];
+  useEffect(() => {setActive(null); setError(""); setFilter("all");}, [r.id]);
   function update(x: Submission) {
-    onChange({
-      ...r,
-      rows: r.rows.map((s) => (s.employeeId === x.employeeId ? x : s)),
-    });
+    if (active !== null) onChange(updateRequestRow(r, active, x));
   }
   function approve(s: Submission) {
     const issues = rowIssues(s, r.fields);
@@ -1142,7 +1142,7 @@ function RequestDetail({
           </button>
           <button className="primary" onClick={onExport}>
             <Download size={17} />
-            취합표 CSV
+            취합표 CSV · 미확인 포함 가능
           </button>
         </div>
       </div>
@@ -1169,6 +1169,7 @@ function RequestDetail({
         </p>
       )}
       <RequestFollowup key={r.id} request={r} employees={employees} />
+      <RequestReadiness request={r} employees={employees} onInspect={rowIndex => {setFilter("all"); setActive(rowIndex); setError("");}} />
       <div className="submission-table">
         <div className="submission-head">
           <span>직원 / 팀</span>
@@ -1177,12 +1178,13 @@ function RequestDetail({
           <span>자료 확인</span>
         </div>
         {r.rows
-          .filter((s) => filter === "all" || s.state === filter)
-          .map((s) => {
+          .map((s, rowIndex) => ({s, rowIndex}))
+          .filter(({s}) => filter === "all" || s.state === filter)
+          .map(({s, rowIndex}) => {
             const emp = employees.find((e) => e.id === s.employeeId);
             const issues = rowIssues(s, r.fields);
             return (
-              <div className="submission-row" key={s.employeeId}>
+              <div className="submission-row" key={rowIndex}>
                 <span>
                   <b>{emp?.name || "직원"}</b>
                   <small>{emp?.team || "팀 미지정"}</small>
@@ -1198,7 +1200,7 @@ function RequestDetail({
                 <button
                   className="secondary"
                   onClick={() => {
-                    setActive(s.employeeId);
+                    setActive(rowIndex);
                     setError("");
                   }}
                 >
@@ -1215,8 +1217,8 @@ function RequestDetail({
       {row && (
         <div className="submission-editor">
           <div className="panel-title">
-            <h3>{employees.find((e) => e.id === active)?.name} 제출자료</h3>
-            <button aria-label="제출자료 닫기" onClick={() => setActive("")}>
+            <h3>{active! + 1}행 · {employees.find((e) => e.id === row.employeeId)?.name || "직원 확인 필요"} 제출자료</h3>
+            <button aria-label="제출자료 닫기" onClick={() => setActive(null)}>
               <X size={18} />
             </button>
           </div>
