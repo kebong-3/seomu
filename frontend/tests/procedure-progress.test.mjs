@@ -16,7 +16,7 @@ assert.equal(restored.selected,p.id);
 assert.deepEqual(Array.from(currentRecord(p,restored.records[p.id]).checks),[0,2]);
 assert.deepEqual(Array.from(currentRecord(second,restored.records[second.id]).checks),[1]);
 assert.equal(currentRecord(p,restored.records[p.id]).note,'10월 교육자료');
-for(const patch of [{source:'새 문서'},{version:'v2'},{text:p.text+' 변경'},{steps:[...p.steps].reverse()},{institution:'다른 기관'}]){
+for(const patch of [{source:'새 문서'},{version:'v2'},{text:p.text+' 변경'},{steps:[...p.steps].reverse()},{institution:'다른 기관'},{questions:[{id:'condition',label:'적용 조건',quote:p.steps[0].quote,options:[{value:'yes',label:'해당'},{value:'no',label:'미해당'}]}]},{sourceDocument:{id:'document',version:1}}]){
  const changed={...p,...patch};
  assert.equal(currentRecord(changed,record).stale,true);
  assert.equal(currentRecord(changed,record).checks.length,0);

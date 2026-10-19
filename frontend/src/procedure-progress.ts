@@ -4,7 +4,7 @@ export type ProcessingRecord={snapshot:string;checks:number[];note:string};
 export type ProcedureProgress={version:1;selected:string;records:Record<string,ProcessingRecord>};
 export const emptyProgress=():ProcedureProgress=>({version:1,selected:'',records:{}});
 // Store the exact basis, rather than a lossy hash, so source edits cannot retain confirmation.
-export function procedureSnapshot(p:Procedure){return JSON.stringify([p.title,p.institution,p.source,p.version,p.text,p.steps]);}
+export function procedureSnapshot(p:Procedure){return JSON.stringify([p.title,p.institution,p.source,p.version,p.text,p.steps,...(p.questions?[p.questions]:[]),...(p.sourceDocument?[p.sourceDocument]:[])]);}
 export function parseProgress(raw:string|null):ProcedureProgress{
  if(!raw)return emptyProgress();
  if(raw.length>25000000)throw Error('처리 기록 용량 초과');

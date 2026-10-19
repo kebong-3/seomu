@@ -23,3 +23,5 @@ console.log('procedure transfer: guards, conflicts, check reset, stale basis, st
 const orphanPlan=planProcedureImport(bundle,[],{...emptyProgress(),records:{orphan:progress.records[p.id]}});assert.equal(Object.keys(orphanPlan.progress.records).includes('orphan'),false);
 let invalidWrites=0;assert.equal(persistProcedureImport({getItem:()=>null,setItem(){invalidWrites++},removeItem(){}},[p,p],emptyProgress()).ok,false);assert.equal(invalidWrites,0);
 assert.throws(()=>parseProcedureBundle(JSON.stringify({...bundle,progress:undefined})));
+const bound=procedureBundle([{...p,sourceDocument:{id:'old-server-document',version:2}}],emptyProgress());
+assert.equal(planProcedureImport(bound,[],emptyProgress()).accepted[0].sourceDocument,undefined);
