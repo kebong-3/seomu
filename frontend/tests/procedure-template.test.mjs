@@ -11,7 +11,7 @@ const element=new DOMParser().parseFromString('<r><p/></r>','application/xml').d
 if(!('parentElement' in element))Object.defineProperty(Object.getPrototypeOf(element),'parentElement',{get(){return this.parentNode?.nodeType===1?this.parentNode:null;}});
 const nativeRequire=createRequire(import.meta.url),cache=new Map();
 function load(name){if(cache.has(name))return cache.get(name);const context={exports:{},structuredClone,crypto:webcrypto,Date,Blob,URL,DOMParser,XMLSerializer,TextDecoder,setTimeout,console,require:n=>n.startsWith('./')?load(n.slice(2)):nativeRequire(n)};vm.runInNewContext(ts.transpileModule(readFileSync(new URL(`../src/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,context);cache.set(name,context.exports);return context.exports;}
-const {inspectTemplate,renderTemplate,templateMissing}=load('procedure-template');
+const {inspectTemplate,renderTemplate,templateMissing,readRegulationSource}=load('procedure-template');
 const file=(name,data)=>({name,size:data.byteLength,arrayBuffer:async()=>ArrayBuffer.isView(data)?data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength):data});
 let wb=new ExcelJS.Workbook(),s=wb.addWorksheet('기관서식');s.getCell('A1').value='기관: {{기관명}}';s.getCell('A1').font={bold:true};s.mergeCells('A2:B2');s.getCell('A2').value={richText:[{text:'{{담',font:{color:{argb:'FFFF0000'}}},{text:'당자}}'}]};s.getCell('C1').value={formula:'1+1',result:2};
 const raw=await wb.xlsx.writeBuffer(),original=Buffer.from(raw);const template=await inspectTemplate(file('기관서식.xlsx',raw),'procedure');
@@ -23,4 +23,9 @@ const filled=await renderTemplate(h,{'기관명':'가상 & 기관','담당자':'
 const bytes=new DataView(outputBuffer);assert.equal(bytes.getUint16(8,true),0);const nameLen=bytes.getUint16(26,true);assert.equal(new TextDecoder().decode(new Uint8Array(outputBuffer,30,nameLen)),'mimetype');assert.equal(await output.file('Contents/header.xml').async('string'),'<header/>');
 await assert.rejects(()=>renderTemplate(h,{'기관명':'기관'}));await assert.rejects(()=>inspectTemplate(file('기존.hwp',hwpx),'procedure'));
 const macro=new JSZip();macro.file('xl/vbaProject.bin','fake');const macroBuffer=await macro.generateAsync({type:'arraybuffer'});await assert.rejects(()=>inspectTemplate(file('macro.xlsx',macroBuffer),'procedure'));
+const source=await readRegulationSource(file('규정.hwpx',hwpx));assert.ok(source.text.includes('기관 {{기관명}} / {{담당자}}'));assert.equal(source.text.split('\n').length,3);assert.ok(source.notes.length);
+zip.file('Contents/section1.xml','<sec xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph"><hp:p><hp:run><hp:t>두번째 구역</hp:t></hp:run></hp:p></sec>');zip.file('Contents/content.hpf','<package xmlns:opf="http://www.idpf.org/2007/opf/"><opf:manifest><opf:item id="s0" href="Contents/section0.xml"/><opf:item id="s1" href="Contents/section1.xml"/></opf:manifest><opf:spine><opf:itemref idref="s1"/><opf:itemref idref="s0"/></opf:spine></package>');
+const orderedSource=await readRegulationSource(file('규정.hwpx',await zip.generateAsync({type:'arraybuffer'})));assert.ok(orderedSource.text.startsWith('두번째 구역\n'));assert.equal(orderedSource.notes.length,1);
+const plain=new TextEncoder().encode('출장 정산 원문');assert.equal((await readRegulationSource(file('규정.txt',plain))).text,'출장 정산 원문');
+await assert.rejects(()=>readRegulationSource(file('규정.txt',new TextEncoder().encode('가'.repeat(24001)))));
 console.log('Templates: editable XLSX values/styles/merged rich text, formula-like strings, split HWPX placeholders, XML escaping, original integrity, ordered mimetype, stale preview removal, script exclusion, missing-value guards passed');

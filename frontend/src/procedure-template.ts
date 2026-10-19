@@ -81,6 +81,43 @@ function paragraphs(doc: Document) {
     }),
   );
 }
+export async function readRegulationSource(file: File): Promise<{text:string;notes:string[]}> {
+  let text = '', notes: string[] = [];
+  if (/\.(txt|md)$/i.test(file.name)) {
+    if (file.size > 100000) throw Error('TXT·MD 원문은 100KB 이하로 선택하세요.');
+    const bytes = await file.arrayBuffer();
+    try { text = new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
+    catch { text = new TextDecoder('euc-kr').decode(bytes); notes.push('EUC-KR로 읽었습니다. 원문의 글자가 올바른지 확인하세요.'); }
+  } else if (/\.hwpx$/i.test(file.name)) {
+    const {zip,sections} = await hwpxArchive(await file.arrayBuffer());
+    const order:string[] = [];
+    const packageFile = zip.file('Contents/content.hpf');
+    if (packageFile) {
+      const packageXml = await packageFile.async('string');
+      if (/<!DOCTYPE|<!ENTITY/i.test(packageXml)) throw Error('HWPX 구성 정보를 확인하세요.');
+      const doc = new DOMParser().parseFromString(packageXml,'application/xml');
+      if (doc.getElementsByTagName('parsererror').length) throw Error('HWPX 구성 정보가 손상되었습니다.');
+      const manifest = new Map(Array.from(doc.getElementsByTagNameNS('*','item')).map(item=>[item.getAttribute('id'),item.getAttribute('href')||'']));
+      for (const item of Array.from(doc.getElementsByTagNameNS('*','itemref'))) {
+        const href=manifest.get(item.getAttribute('idref'))||'';
+        const name=href.startsWith('Contents/')?href:'Contents/'+href;
+        if (sections.some(s=>s.name===name)) order.push(name);
+      }
+    }
+    sections.sort((a,b)=>{
+      const ai=order.indexOf(a.name),bi=order.indexOf(b.name);
+      if(ai>=0||bi>=0)return (ai<0?Infinity:ai)-(bi<0?Infinity:bi);
+      return Number(a.name.match(/section(\d+)/)?.[1]||0)-Number(b.name.match(/section(\d+)/)?.[1]||0);
+    });
+    text=sections.flatMap(s=>paragraphs(s.doc).map(nodes=>nodes.map(n=>n.textContent||'').join('')).filter(t=>t.trim())).join('\n');
+    notes.push('HWPX 본문과 표 안의 문단을 이 브라우저에서 읽었습니다. 이미지 속 글자·머리말·각주 등은 문서함에서 별도 인식해 확인하세요.');
+    if(order.length!==sections.length)notes.push('일부 구역은 번호 순서로 읽었습니다. 원문과 읽기 순서를 확인하세요.');
+  } else throw Error('TXT·MD·HWPX를 선택하세요. PDF·HWP 등은 문서함에서 인식할 수 있습니다.');
+  text=text.replace(/^\uFEFF/,'').trim();
+  if(!text)throw Error('읽을 수 있는 본문이 없습니다. 문서함에서 인식해 주세요.');
+  if(text.length>24000)throw Error('원문이 24,000자를 넘습니다. 해당 업무에 필요한 부분을 TXT로 나누거나 붙여넣어 주세요.');
+  return {text,notes};
+}
 export async function inspectTemplate(
   file: File,
   procedureId: string,

@@ -904,6 +904,20 @@ export function SituationAssistant({
                   }}
                 />
               </label>
+              <button className="primary" disabled={busy} onClick={async()=>{
+                const name='연습-업무준비서-서식.xlsx';
+                const existing=templates.find(t=>t.name===name);
+                if(existing){setTemplateId(existing.id);return;}
+                if(templates.length>=10){setMessage('서식은 절차당 10개까지 보관합니다.');return;}
+                setBusy(true);
+                try{
+                  const blob=await sampleTemplate();
+                  const t=await inspectTemplate(new File([blob],name,{type:blob.type}),procedure.id);
+                  await persistTemplate(t);setTemplates([...templates,t]);setTemplateId(t.id);
+                  setMessage('연습 서식을 바로 적용했습니다. 가져온 값은 다시 쓰지 않고 담당자만 입력하면 됩니다.');
+                }catch(e){setMessage(e instanceof Error?e.message:'연습 서식을 적용하지 못했습니다.');}
+                finally{setBusy(false);}
+              }}>연습 서식 바로 적용</button>
               <button
                 className="secondary"
                 disabled={busy}

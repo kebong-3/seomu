@@ -3,6 +3,7 @@ import { api, key } from "./api";
 import { AISelector } from "./ai-settings";
 import type { Doc, Status } from "./types";
 import type { Procedure } from "./procedures";
+import {readRegulationSource} from './procedure-template';
 
 export type ProcedureSeed = { doc: Doc };
 export function ProcedureDraftBuilder({
@@ -146,30 +147,27 @@ export function ProcedureDraftBuilder({
       </p>
       <div className="ai-links">
         <label>
-          원문 TXT·MD 가져오기
+          규정 TXT·MD·HWPX 가져오기
           <input
             type="file"
-            accept=".txt,.md"
+            accept=".txt,.md,.hwpx"
             disabled={busy}
             onChange={async (e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
               if (!f) return;
+              setBusy(true);
               try {
-                if (f.size > 100000)
-                  throw Error("100KB 이하의 원문을 선택하세요.");
-                const content = await f.text();
-                if (content.length > 24000)
-                  throw Error("원문을 24,000자 이하로 나누어 주세요.");
-                setText(content);
+                const content = await readRegulationSource(f);
+                setText(content.text);
                 setSource(f.name);
                 setBound(undefined);
-                setMessage("파일을 읽었습니다. 시행일·문서 버전을 지정하세요.");
+                setMessage("파일을 읽었습니다. 시행일·문서 버전을 지정하세요. "+content.notes.join(' '));
               } catch (err) {
                 setMessage(
                   err instanceof Error ? err.message : "파일 읽기 실패",
                 );
-              }
+              } finally {setBusy(false);}
             }}
           />
         </label>
@@ -181,7 +179,7 @@ export function ProcedureDraftBuilder({
           문서함의 규정 가져오기
         </button>
         <button className="secondary" onClick={onConnect}>
-          PDF·HWP·HWPX 문서 인식
+          PDF·HWP·이미지 문서 인식
         </button>
       </div>
       {docs.length > 0 && (
