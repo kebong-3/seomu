@@ -50,6 +50,7 @@ import {
 import type { Status } from "./types";
 import { saveFile } from "./workspace-store";
 import EffectEvidence from "./effect-evidence";
+import {SituationReusePanel} from "./situation-reuse-panel";
 import "./situation.css";
 
 function initial() {
@@ -845,6 +846,19 @@ export function SituationAssistant({
               </details>
             )}
           </section>
+          <SituationReusePanel
+            source={current}
+            procedure={procedure}
+            existing={cases.items}
+            blocked={busy ? "현재 작업이 끝난 뒤 새 업무를 준비하세요." : loaded.error || procedureError || remoteChanged}
+            onCreate={fresh => {
+              if (addCase(fresh)) {
+                setSituation(fresh.situation);
+                setProcedureId(fresh.procedureId);
+                setMessage("원래 업무건을 보존하고 새 업무건을 만들었습니다. 선택한 입력값과 새 상황의 조건을 다시 확인하세요.");
+              }
+            }}
+          />
           <section className="portal-panel" aria-label="필요한 문서 준비">
             <div className="assistant-section-title">
               <FolderOpen size={22} />
